@@ -31,18 +31,41 @@ class CompletedTrials:
   """A group of completed trials.
 
   Attributes:
-    completed: Completed Trials.
+    trials: Completed Trials.
   """
 
   def __attrs_post_init__(self):
-    for trial in self.completed:
+    for trial in self.trials:
       if trial.status != vz.TrialStatus.COMPLETED:
         raise ValueError(f'All trials must be completed. Bad trial:\n{trial}')
 
-  completed: Sequence[vz.Trial] = attr.field(
+  trials: Sequence[vz.Trial] = attr.field(
       converter=tuple,
       validator=attr.validators.deep_iterable(
-          attr.validators.instance_of(vz.Trial)))
+          attr.validators.instance_of(vz.Trial)
+      ),
+  )
+
+
+@attr.define(frozen=True)
+class ActiveTrials:
+  """A group of active (a.k.a pending) trials.
+
+  Attributes:
+    trials: Pending Trials.
+  """
+
+  def __attrs_post_init__(self):
+    for trial in self.trials:
+      if trial.status != vz.TrialStatus.ACTIVE:
+        raise ValueError(f'All trials must be active. Bad trial:\n{trial}')
+
+  trials: Sequence[vz.Trial] = attr.field(
+      converter=tuple,
+      validator=attr.validators.deep_iterable(
+          attr.validators.instance_of(vz.Trial)
+      ),
+  )
 
 
 class _SuggestionAlgorithm(abc.ABC):
@@ -68,26 +91,33 @@ class Designer(_SuggestionAlgorithm):
 
   Designer is the recommended interface for implementing commonly used
   algorithms such as GP-UCB and evolutionary algorithms. A Designer can be
-  wrapped into a pythia `Policy` via `DesignerPolicy`. When run inside a service
-  binary, a Designer instance does not persist during the lifetime of a `Study`.
-  It receives all trials from the beginning of the study in `update()` calls.
-  This can be inefficient.
+  wrapped into a pythia `Policy` via `DesignerPolicy` (stateless) or
+  '(Partially)SerializableDesignerPolicy' (stateful).
 
-  If your Designer can benefit from a persistent state, implement
+  If your Designer is stateless it should match with 'DesignerPolicy' which
+  is responsible for calling the 'update' method and pass all completed trials
+  since the beginning of the trials as well as all currently pending
+  trials.
+
+  If your Designer can benefit from a persistent state (stateful), implement
   `(Partially)SerializableDesigner` interface and use
   `(Partially)SerializableDesignerPolicy` to wrap it.
   Vizier service will serialize the Designer's state in DB, restore it for
-  the next usage, and update it with the newly completed trials since the last
-  suggestion.
+  the next usage, and update it with the newly completed and pending trials
+  since the last suggestion.
 
-  > IMPORTANT: If your Designer changes its state inside `suggest()` (e.g. to
-  > incorporate its own suggestions before completion), then use
-  > (Partially)SerializableDesigner interface instead.
+  IMPORTANT: If your Designer changes its state inside `suggest()` (e.g. to
+  incorporate its own suggestions before completion), then use
+  (Partially)SerializableDesigner interface instead or take advantage of the
+  'pending' trials argument.
+
+  Note that when run inside a service binary, a Designer instance does not
+  persist during the lifetime of a `Study`.
   """
 
   @abc.abstractmethod
-  def update(self, delta: CompletedTrials) -> None:
-    """Incorporates newly completed trials into the designer's state."""
+  def update(self, completed: CompletedTrials, active: ActiveTrials) -> None:
+    """Incorporates completed and active trials into the designer's state."""
     pass
 
 

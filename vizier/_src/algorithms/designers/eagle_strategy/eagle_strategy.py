@@ -299,7 +299,9 @@ class EagleStrategyDesigner(vza.PartiallySerializableDesigner):
       )
       suggested_parameters[param_config.name] = perturbed_value
 
-  def update(self, delta: vza.CompletedTrials) -> None:
+  def update(
+      self, completed: vza.CompletedTrials, active: vza.ActiveTrials
+  ) -> None:
     """Update the pool.
 
     Iterate over new completed trials and update the firefly pool. Every trial
@@ -308,9 +310,10 @@ class EagleStrategyDesigner(vza.PartiallySerializableDesigner):
     a new parent fly id.
 
     Args:
-      delta:
+      completed:
+      active:
     """
-    for trial in delta.completed:
+    for trial in completed.trials:
       # Replaces trial metric name with a canonical metric name, which makes the
       # serialization and deserialization simpler.
       trial = self._utils.standardize_trial_metric_name(trial)

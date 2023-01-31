@@ -79,7 +79,7 @@ class DesignerSuggester(AlgorithmSuggester):
     return trials
 
   def post_completion_callback(self, completed: vza.CompletedTrials) -> None:
-    return self._designer.update(completed)
+    return self._designer.update(completed, vza.ActiveTrials([]))
 
   @property
   def supporter(self) -> pythia.InRamPolicySupporter:
